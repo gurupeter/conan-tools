@@ -37,7 +37,7 @@ pipeline {
         sh script: "conan config install https://github.com/includeos/conan_config.git", label: "conan config install"
       }
     }
-    stage('Build') {
+    stage('Export') {
       steps {
         sh script: "conan export $SRC $USER/$CHAN", label: "Export conan package"
       }
@@ -56,7 +56,7 @@ pipeline {
             script: "conan inspect -a version $SRC | cut -d ' ' -f 2",
             returnStdout: true
           ).trim()
-          sh script: "conan upload --all -r $REMOTE conanTools/${version}@$USER/$CHAN", label: "Upload includeos to bintray"
+          sh script: "conan upload --all -r $REMOTE conan-tools/${version}@$USER/$CHAN", label: "Upload conan-tools to bintray"
         }
       }
     }

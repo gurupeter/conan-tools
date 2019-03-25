@@ -23,7 +23,7 @@ def git_get_semver():
         return '0.0.0'
 
 class ConanTools(ConanFile):
-    name = "conanTools"
+    name = "conan-tools"
     version = git_get_semver()
     license = "Apache-2.0"
     description = "Functions used across multiple conanfile.py in the IncludeOS project"
