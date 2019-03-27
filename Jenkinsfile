@@ -1,36 +1,17 @@
 pipeline {
   agent { label 'ubuntu-18.04' }
-
-  options {
-    checkoutToSubdirectory('src')
-  }
-
+  options { checkoutToSubdirectory('src') }
   environment {
     CONAN_USER_HOME = "${env.WORKSPACE}"
     REMOTE = "${env.CONAN_REMOTE}"
     USER = 'includeos'
-    CHAN = 'default'
+    CHAN_LATEST = 'latest'
+    CHAN_STABLE = 'stable'
     BINTRAY_CREDS = credentials('devops-includeos-user-pass-bintray')
     SRC = "${env.WORKSPACE}/src"
   }
 
   stages {
-    stage('Conan channel') {
-      parallel {
-        stage('Pull request') {
-          when { changeRequest() }
-          steps { script { CHAN = 'test' } }
-        }
-        stage('Master merge') {
-          when { branch 'master' }
-          steps { script { CHAN = 'latest' } }
-        }
-        stage('Stable release') {
-          when { buildingTag() }
-          steps { script { CHAN = 'stable' } }
-        }
-      }
-    }
     stage('Setup') {
       steps {
         sh script: "ls -A | grep -v src | xargs rm -r || :", label: "Clean workspace"
@@ -39,26 +20,33 @@ pipeline {
     }
     stage('Export') {
       steps {
-        sh script: "conan export $SRC $USER/$CHAN", label: "Export conan package"
+        sh script: "conan export $SRC $USER/$CHAN_LATEST", label: "Export conan package"
+        script { VERSION = sh(script: "conan inspect -a version $SRC | cut -d ' ' -f 2", returnStdout: true).trim() }
       }
     }
     stage('Upload to bintray') {
-      when {
-        anyOf {
-          branch 'master'
-          buildingTag()
+      parallel {
+        stage('Latest release') {
+          when { branch 'master' }
+          steps {
+            upload_package("$CHAN_LATEST")
+          }
         }
-      }
-      steps {
-        script {
-          sh script: "conan user -p $BINTRAY_CREDS_PSW -r $REMOTE $BINTRAY_CREDS_USR", label: "Login to bintray"
-          def version = sh (
-            script: "conan inspect -a version $SRC | cut -d ' ' -f 2",
-            returnStdout: true
-          ).trim()
-          sh script: "conan upload --all -r $REMOTE conan-tools/${version}@$USER/$CHAN", label: "Upload conan-tools to bintray"
+        stage('Stable release') {
+          when { buildingTag() }
+          steps {
+            sh script: "conan copy --all $PACKAGE/$VERSION@$USER/$CHAN_LATEST $USER/$CHAN_STABLE", label: "Copy to stable channel"
+            upload_package("$CHAN_STABLE")
+          }
         }
       }
     }
   }
+}
+
+def upload_package(String channel) {
+  sh script: """
+    conan user -p $BINTRAY_CREDS_PSW -r $REMOTE $BINTRAY_CREDS_USR
+    conan upload --all -r $REMOTE $PACKAGE/$VERSION@$USER/$channel
+  """, label: "Upload to bintray"
 }
