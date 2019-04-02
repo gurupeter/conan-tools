@@ -4,6 +4,7 @@ pipeline {
   environment {
     CONAN_USER_HOME = "${env.WORKSPACE}"
     REMOTE = "${env.CONAN_REMOTE}"
+    PACKAGE = 'conan-tools'
     USER = 'includeos'
     CHAN_LATEST = 'latest'
     CHAN_STABLE = 'stable'
